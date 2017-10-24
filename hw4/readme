@@ -1,0 +1,7 @@
+The main difference between expand_fsm1 and expand_fsm2 is that the first is an fsa (no output) and the second
+is a transducer, in which each character outputs itself, and then when each expanded morphotactic path is complete
+there is an arc with empty input (*e*) that outputs the string with the completed morphotactic rule name.
+
+e.g "sings" will have input output pairs that look like this:
+
+s:s i:i n:n g:g *e*:irreg_verb_stem s:s *e*:3sing

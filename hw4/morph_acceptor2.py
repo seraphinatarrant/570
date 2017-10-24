@@ -30,7 +30,7 @@ if __name__ == "__main__":
             if input_string:
                 next_line = output[current_index+1]
                 if '(0 states / 0 arcs)' in next_line:
-                    result = 'no'
+                    result = '*NONE*'
                 else:
                     output_line = output[current_index+2]
                     result =''.join(output_line.split()[:-1])
