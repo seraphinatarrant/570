@@ -1,0 +1,5 @@
+"they" "can" "fish" => "PRO" "AUX" "NOUN" 0.693
+"they" "can" "can" "fish" => "PRO" "AUX" "AUX" "NOUN" 0.68607
+"they" "fish" => "PRO" "NOUN" 0.7
+"they" "fish" "can" => "PRO" "NOUN" "AUX" 0.693
+"they" "fish" "can" "can" => "PRO" "NOUN" "AUX" "AUX" 0.68607

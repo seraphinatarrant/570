@@ -1,0 +1,14 @@
+expand_fsm1.sh
+
+morph_acceptor1.sh
+
+expand_fsm2.sh
+
+morph_acceptor2.sh
+
+q4/q4_expand_fsm
+q4/q4_result
+
+q5/q5_expand_fsm
+q5/q5_result
+

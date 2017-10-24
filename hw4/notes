@@ -1,0 +1,12 @@
+Given the rule: `(q0 (q2 irreg_verb_stem))` and lexicon entry `sing irreg_verb_stem`,
+is the proper expansion something like this
+
+(q0 (q0s s))
+(q0s (q0si i))
+(q0si (q0sin n))
+(q0sin (q2 g))
+
+
+One mistake I made implementing this was that i was not populating the epsilon transitions from the morph_rules
+file into expanded fsa, because they did not exist in the lexicon file.
+It meant that I was not accepting the `irreg_verb_stem`s.  In case it happens to someone else....
