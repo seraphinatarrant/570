@@ -51,7 +51,7 @@ def expand_fsm(morph_fsm,lexicon):
                     from_state = next_state
                 #print final transition from last state to the to_state, with an epsilon and the word label
                 for to_state in to_states:
-                    print('({} ({} {} {}))'.format(from_state, to_state, empty_symbol, '/{}'.format(class_label))) #input is nothing, output is class_label
+                    print('({} ({} {} {}))'.format(from_state, to_state, empty_symbol, '/{}|'.format(class_label))) #input is nothing, output is class_label. pipe is there for easy formatting later
         except KeyError:
             print('{} was not in morphotactic fsm rules'.format(class_label), file=sys.stderr)
         #need to also account for epsilon transitions

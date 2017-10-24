@@ -33,6 +33,7 @@ if __name__ == "__main__":
                     result = 'no'
                 else:
                     output_line = output[current_index+2]
-                    result = output_line
+                    result =''.join(output_line.split()[:-1])
+                    result = re.sub(r'[|]',r' ',result).strip()
                 print(input+' => '+result)
             current_index+=1
