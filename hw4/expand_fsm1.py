@@ -1,4 +1,4 @@
-#command line expandfsm1.py lexicon morph_rules
+#command line expandfsm1.py lexicon morph_rules output fssm
 #builds an expanded FSM given a lexicon and morphotactic rules.
 
 '''
@@ -35,7 +35,9 @@ def expand_fsm(morph_fsm,lexicon):
     '''
     start_state, final_state, existing_states = morph_fsm[1],morph_fsm[0],set()
     # existing states to track states that are already being used to prevent naming collisions
-    print(final_state)
+    output_list = []
+    output_list.append(final_state)
+    output_list.append('({} ({} *e*))'.format(start_state,start_state)) #this ensures that the start state comes first
     for entry in lexicon:
         word, class_label = entry[0], entry[1]
         try:
@@ -54,12 +56,12 @@ def expand_fsm(morph_fsm,lexicon):
                             if next_state not in existing_states:
                                 unique_state = True
                             count+=1
-                    print('({} ({} {}))'.format(from_state, next_state, char))
+                    output_list.append('({} ({} {}))'.format(from_state, next_state, char))
                     existing_states.add(next_state)
                     from_state = next_state
                 #print final transition from last char to the to_state
                 for to_state in to_states:
-                    print('({} ({} {}))'.format(from_state, to_state, word[-1:]))
+                    output_list.append('({} ({} {}))'.format(from_state, to_state, word[-1:]))
         except KeyError:
             print('{} was not in morphotactic fsm rules'.format(class_label), file=sys.stderr)
         #need to also account for epsilon transitions
@@ -68,10 +70,11 @@ def expand_fsm(morph_fsm,lexicon):
         for transition in epsilon_transitions:  #yes this is copy pasted so it should be a function... but oh well for now
             e_from_state, e_to_states = transition[0], transition[1] #remember could be list
             for e_to_state in e_to_states:
-                print('({} ({} {}))'.format(e_from_state, e_to_state, '*e*'))
+                output_list.append('({} ({} {}))'.format(e_from_state, e_to_state, '*e*'))
 
     except KeyError:
         pass
+    return output_list
 
 
 def import_morphotactics(file):
@@ -141,6 +144,8 @@ def replace_parens(line):
 if __name__ == "__main__":
     lexicon = import_lexicon(sys.argv[1])
     morph_rules = import_morphotactics(sys.argv[2])
-    expand_fsm(morph_rules, lexicon)
+    output_file_name = sys.argv[3]
+    with open(output_file_name, 'w') as file:
+        file.write('\n'.join(expand_fsm(morph_rules, lexicon)))
    #print(lexicon)
    #print(morph_rules[2])

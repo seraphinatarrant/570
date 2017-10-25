@@ -5,3 +5,7 @@ there is an arc with empty input (*e*) that outputs the string with the complete
 e.g "sings" will have input output pairs that look like this:
 
 s:s i:i n:n g:g *e*:irreg_verb_stem s:s *e*:3sing
+
+For both of them I chose to make a separate path for each word (to prevent naming collisions) with the idea of minimising later.
+This is less efficient than combining paths (which would work for the example given) but prevent invisible logic bugs
+in other possible situations. And the redundancy would go away if we minimised later anyway.
