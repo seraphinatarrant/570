@@ -36,27 +36,23 @@ def count_ngrams(input, n=3):
     '''
     Collects ngrams from training data. Takes only one n, not a range, so if want unigram, bigram, trigram,
     then need to call multiple times and get a separate Counter object for each.
-    :param input: an input string, pre-tokenised
+    :param input: an input list of sentence strings, pre-tokenised and with EOS and BOS appended
     :param n: the n of 'ngram' (ie unigram, bigram, etc)
     :return: a Counter of ngram counts. Defaults to trigram.
     '''
-    ngrams = Counter()
-    return ngrams
+    ngram_counter = Counter()
+    for sentence in input:
+        tokens = sentence.split()
+        index, end = 0, len(tokens)
+        #add ngrams to counter
+        while index+(n-1) < end:
+            token = ' '.join([tokens[index+i] for i in range(0,n)]) #makes sure the token is the correct ngram
+            ngram_counter[token] += 1
+            index += 1 #steps forward in list
+    return ngram_counter
 
-def output_ngrams(filename, ngram_counts):
-    '''
-    Output:
-    unigrams, bigrams, trigrams, etc
-    sort the lines by the frequency of ngrams in descending order. Ex:
-    895 a
-    50 the book
-    200 thank you very
-    :param filename:
-    :param ngram_counts:
-    :return: No return - writes to file
-    '''
 
-def build_ngram_counts(inputfile, outputfile, ngrams = [1,2,3]):
+def build_ngram_counts(inputfile, outputfile = 'tmp_ngram_output', ngrams = [1,2,3]):
     '''
     Master function that executes the steps of processing input, counting ngrams, and outputting file.
     :param inputfile: name of input file
@@ -67,19 +63,22 @@ def build_ngram_counts(inputfile, outputfile, ngrams = [1,2,3]):
     training_data = [] # important that this is a list not a set since we want to preserve duplicates
 
     #Preprocess the input with BOS and EOS symbols
-    with open(inputfile,'rU') as infile
+    with open(inputfile,'rU') as infile:
         for line in infile:
             new_line = process_sentence(line)
             training_data.append(line)
     #Count ngrams
-    for number in ngrams:
-
+    with open(outputfile, 'w') as outfile:
+        for number in ngrams:
+            result = count_ngrams(training_data, number).most_common()
+            [outfile.write(str(line[1])+' '+line[0]+'\n') for line in result]
 
 
 
 if __name__ == "__main__":
     input_file = sys.argv[1]
     #output_file_name = sys.argv[2]
+    build_ngram_counts(input_file)
 
 
 
