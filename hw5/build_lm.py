@@ -65,7 +65,7 @@ def build_lm(input_file, output_file = 'tmp_lm_output'):
             outfile.write('\n\\{}-grams:\n'.format(ngram_type))
             for entry in ngram_counter.most_common():
                 key = entry[0]
-                outfile.write('{} {} {} {}\n'.format(ngram_counter[key], ngram_probs[key][0], ngram_probs[key][1], ' '.join(key))) #NEED TO FORMAT KEY FROM TUPLE TO STRING
+                outfile.write('{} {} {} {}\n'.format(ngram_counter[key], ngram_probs[key][0], ngram_probs[key][1], ' '.join(key)))
             ngram_type += 1
 
 
