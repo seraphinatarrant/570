@@ -50,9 +50,9 @@ def build_lm(input_file, output_file = 'tmp_lm_output'):
             for key in ngram_counter: #populate dict of probabilities for each ngram key in Counter dict
                 count = ngram_counter[key]
                 if ngram_type == 1:
-                    divisor = tokens
+                    divisor = tokens #if unigram, divide by num tokens
                 else:
-                    divisor = all_grams[key[:-1]]
+                    divisor = all_grams[key[:-1]] #else divide by the n-1 gram
                 prob = count/divisor
                 logprob = math.log(prob, 10)
                 ngram_probs[key] = (prob, logprob)
