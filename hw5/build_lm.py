@@ -71,5 +71,5 @@ def build_lm(input_file, output_file = 'tmp_lm_output'):
 
 
 if __name__ == "__main__":
-    input_file = sys.argv[1]
-    build_lm(input_file)
+    input_file, output_file = sys.argv[1], sys.argv[2]
+    build_lm(input_file, output_file)

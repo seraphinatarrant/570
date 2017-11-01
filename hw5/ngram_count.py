@@ -66,7 +66,7 @@ def build_ngram_counts(inputfile, outputfile = 'tmp_ngram_output', ngrams = [1,2
     with open(inputfile,'rU') as infile:
         for line in infile:
             new_line = process_sentence(line)
-            training_data.append(line)
+            training_data.append(new_line)
     #Count ngrams
     with open(outputfile, 'w') as outfile:
         for number in ngrams:
@@ -77,8 +77,8 @@ def build_ngram_counts(inputfile, outputfile = 'tmp_ngram_output', ngrams = [1,2
 
 if __name__ == "__main__":
     input_file = sys.argv[1]
-    #output_file_name = sys.argv[2]
-    build_ngram_counts(input_file)
+    output_file = sys.argv[2]
+    build_ngram_counts(input_file, output_file)
 
 
 
