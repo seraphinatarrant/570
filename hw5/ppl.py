@@ -54,7 +54,7 @@ def calc_corpus_ppl(test_data, ngrams, l3, l2, l1, output_file = 'tmp_ppl_output
         sentence_ppl = math.pow(10, av_sentence_prob)
         #write sentence specific info
         output.write('{} sentence, {} words, {} OOVs\n'.format(1, num_words, oov_num))
-        output.write('lgprob={} ppl={}\n\n\n\n'.format(total_prob, sentence_ppl))
+        output.write('lgprob={} ppl={}\n\n\n\n'.format(sentence_prob, sentence_ppl))
     #write corpus specific info
     av_prob = total_prob/(current_sentence+total_words-total_oov)
     ppl = math.pow(10, -av_prob)
@@ -85,7 +85,7 @@ def process_lm(in_file):
 if __name__ == "__main__":
     lm_file, test_data = sys.argv[1], sys.argv[5]
     lambda1, lambda2, lambda3 = float(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4])
-    #output_file = sys.argv[6]
+    output_file = sys.argv[6]
     lm_ngram_probs = process_lm(lm_file)
     #print(lm_ngram_probs[('Pierre',)])
-    corpus_ppl = calc_corpus_ppl(test_data, lm_ngram_probs, lambda3, lambda2, lambda1)
+    corpus_ppl = calc_corpus_ppl(test_data, lm_ngram_probs, lambda3, lambda2, lambda1, output_file)
