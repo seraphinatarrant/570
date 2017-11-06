@@ -63,7 +63,7 @@ def calc_corpus_ppl(test_data, ngrams, l3, l2, l1, output_file = 'tmp_ppl_output
                  'lgprob={} ave_lgprob={} ppl={}\n'.format(current_sentence, total_words, total_oov, total_prob, av_prob, ppl))
     input.close()
     output.close()
-    
+
 def process_lm(in_file):
     '''
     read in an lm file and create a dictionary of probabilities
