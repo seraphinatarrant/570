@@ -8,7 +8,7 @@ Command to run: cat training_data | create_3gram_hmm.py output_hmm_file l1 l2 l3
 unk_prob_file is P(unknown word|tag) and is in format 'tag prob', and is used for smoothing to give some probability
 mass to unknown words.
 
-States: each is now a tag PAIR. Each state remembers the current and the previous state.
+States: each is now a tag PAIR (bigram). Each state remembers the current and the previous state.
 This takes the HMM limitation that each state depends on only the previous one and adapts for trigrams.
 Output: Same as a bigram hmm - words, and BOS, EOS symbols
 Init prob: BOS_BOS 1.0
@@ -21,10 +21,22 @@ Transition probabilities between states are trigram probabilities, where states 
 "overlap" by the edges of their bigrams.
 Emission probabilities from the to state are the bigram probability of the word given the second tag in the to_state.
 
+Interpolated trigram probability for t_3 (which will then be the transition probability) is:
+P_1 = t_3/total_tag_tokens
+P_2 = (t2,t3)/t2
+P_3 = (t1,t2,t3)/(t1,t2)
+
 All probabilities are adjusted with smoothing.
 Emission probabilities are adjusted so that:
 Known words: Psmooth(w|tag) = P(w|tag) * (1 - P(<unk>|tag))
 Unknown words: Psmooth(w|tag) = P(<unk>|tag)
+
+For interpolating with trigrams with unknown bigrams, that is:
+val of P3(t_3|t_1, t_2) when (t_1, t_2) is unseen is undefined (divide by zero).
+We cannot just set it to zero because Pinterpolated is only a distribution is P3, P2 and P1 all are.
+So for the sake of simplicity when (t_1, t_2) is unseen:
+P3(t_3|t_1, t_2) = 1/(T+1) where T is the size of the POS tagset (excl. BOS and EOS, hence the +1 to add EOS back)
+except that when t_3 is BOS, set trigram prob to 0.
 
 '''
 
@@ -49,54 +61,125 @@ def process_sentence(input, regex):
     sentence_tuples.append(('<\/s>', 'EOS'))
     return sentence_tuples
 
-def count_ngrams(input, n=2):
+def count_ngrams(input):
     '''
-    Collects ngrams from input (splodged together from a more general ngram counter, hence why there is an n param)
+    Collects POS type ngrams from input
     NOTE that I reverse the word_tag_bigram tuples to be tag_word bigram tuples for easier handling
     :param input: a list of sentence-lists of (word, tag) tuples
-    :param n: the n of 'ngram' (eg unigram, bigram). Default  2. Wouldn't actually work with anything else at present.
-    :return: counters of tag unigram, word unigram, tag word bigram,  and tag bigram
+    :return: counters of tag unigram, tag bigram, tag trigram, word unigram, tag word bigram. keys all tuples
     '''
-    tag_unigrams, tag_bigrams, word_unigrams, tag_word_bigrams = Counter(), Counter(), Counter(), Counter()
+    tag_unigrams, tag_bigrams, tag_trigrams = Counter(), Counter(), Counter()
+    word_unigrams, tag_word_bigrams = Counter(), Counter()
     for sentence in input:
         index, end = 0, len(sentence)
         #add ngrams to counter
         while index < end:
             tag_word_bigram = tuple(reversed(sentence[index])) #this is so the format is tag,word so I can treat it like a normal bigram probability
-            tag_unigram, word_unigram = tag_word_bigram[0], tag_word_bigram[1]
+            tag_unigram, word_unigram = (tag_word_bigram[0], ), (tag_word_bigram[1], )
 
             tag_unigrams[tag_unigram] += 1
             word_unigrams[word_unigram] += 1
             tag_word_bigrams[tag_word_bigram] += 1
-            if index+(n-1) < end:
-                tag_bigram = (tag_unigram, sentence[index + 1][1])
+            if index+1 < end:
+                tag_bigram = (tag_unigram[0], sentence[index+1][1])
                 tag_bigrams[tag_bigram] += 1
+                if index+2 < end:
+                    tag_trigram = (tag_unigram[0], sentence[index+1][1], sentence[index+2][1])
+                    tag_trigrams[tag_trigram] += 1
             index += 1 #steps forward in list
-    return tag_unigrams, tag_bigrams, word_unigrams, tag_word_bigrams
+    return tag_unigrams, tag_bigrams, tag_trigrams, word_unigrams, tag_word_bigrams
 
-def calc_bigram_probs(bigrams, unigrams):
+def calc_word_probs(bigrams, unigrams, unk_prob_dict):
     '''
-    :param bigrams: a Counter of bigram tuples
-    :param unigrams: a Counter of unigram strings
+    With smoothing based on given P(<unk>|tag)
+    Known words: Psmooth(w|tag) = P(w|tag) * (1 - P(<unk>|tag))
+    :param bigrams: a Counter of bigram tuples, of form (tag, word)
+    :param unigrams: a Counter of unigram tuples of form (tag, )
+    :param unk_prob_dict: a defaultdict(float) of {tag:prob) where prob is P(<unk>|tag)
     :return: a defaultdict of bigram probabilities
     '''
     prob_dict = defaultdict(float)
     for key in bigrams:
-        prob = bigrams[key]/unigrams[key[0]]
-        log_prob = math.log10(prob)
-        prob_dict[key] = (prob, log_prob)
+        prob, unk_prob = bigrams[key]/unigrams[(key[0],)], unk_prob_dict[key[0]]
+        smooth_prob = prob*(1-unk_prob)
+        log_prob = math.log10(smooth_prob)
+        prob_dict[key] = (smooth_prob, log_prob)
     return prob_dict
 
-def make_hmm(data, output_file='tmp_hmm'):
+def calc_ngram_probs(ngrams, uni_tokens):
+    '''
+    Note that I do not calc logprob here since I need only normal probs as this will be used for interpolation.
+    Also having tuple rather than floats would ruin the way the defaultdict returns 0 when Key is missing.
+    :param ngrams: a Counter of ngrams and counts
+    :param uni_tokens: total unigram tokens (to get unigram probabilities)
+    :return: a probability dict of ngrams and their probabilities
+    '''
+    prob_dict = defaultdict(float)
+    for key in ngrams:  # populate dict of probabilities for each ngram key in Counter dict
+        count = ngrams[key]
+        if len(key) == 1:
+            divisor = uni_tokens  # if unigram, divide by num tokens
+        else:
+            divisor = ngrams[key[:-1]]  # else divide by the n-1 gram
+        prob = count / divisor
+        #logprob = math.log10(prob)
+        prob_dict[key] = prob
+    return prob_dict
+
+def calc_interpolated_probs(states, prob_dict, tag_types):
+    interpolated_prob_dict = defaultdict(float)
+    for state_i in states:
+        for state_j in states:
+            if state_i[1] != state_j[0]:
+                continue
+            elif state_i == state_j:
+                continue
+            else: #prob state_i to state_j
+                tag3, tag2, tag1 = state_j[1], state_i[1], state_i[0]
+                unigram_prob, bigram_prob = prob_dict[(tag3,)], prob_dict[(tag2, tag3)]
+                if bigram_prob:
+                    trigram_prob = prob_dict[(tag1, tag2, tag3)]
+                else:
+                    trigram_prob = 1/(tag_types-1)
+                interpolated_prob = l3*trigram_prob + l2*bigram_prob + l1*unigram_prob
+                interpolated_log = math.log10(interpolated_prob)
+                interpolated_prob_dict[(state_i, state_j)] = (interpolated_prob, interpolated_log)
+    return interpolated_prob_dict
+
+def find_all_states(unigrams):
+    '''
+    :param unigrams: a dictionary of the unigrams from which to generate all possible bigrams (which are the state
+    labels in a trigram hmm)
+    :return: a set of all state labels in bigram tuple form
+    '''
+    state_set = set()
+    for tag_i in unigrams:
+        for tag_j in unigrams:
+            new_tag = (tag_i[0], tag_j[0]) #making a bigram tuple out of that unigram tags (have to index them as the unigrams are tuples)
+            state_set.add(new_tag)
+    return state_set
+
+def make_hmm(data, unk_prob_dict, lambda1, lambda2, lambda3, output_file='tmp_hmm_trigram'):
     #assume data is preprocessed
-    tag_unigrams, tag_bigrams, word_unigrams, tag_word_bigrams = count_ngrams(data)
-    state_num, sym_num = len(tag_unigrams), len(word_unigrams)
+    tag_unigrams, tag_bigrams, tag_trigrams, word_unigrams, tag_word_bigrams = count_ngrams(data)
+    state_num, sym_num = len(tag_bigrams), len(word_unigrams) #since now the states are bigrams
+    all_states = find_all_states(tag_unigrams)
+    tag_tokens, tag_types = sum(tag_unigrams.values()), len(tag_unigrams)
 
-    #calc emission and tranition probs from unigram and bigram counters
-    transitions = calc_bigram_probs(tag_bigrams, tag_unigrams)
-    emissions = calc_bigram_probs(tag_word_bigrams, tag_unigrams)
+
+    #calc tag probs and word probs and use tag probs to calc interpolated trigram probs (which are transitions)
+    tag_probs = calc_ngram_probs(tag_unigrams+tag_bigrams+tag_trigrams, tag_tokens)
+    emission_probs = calc_word_probs(tag_word_bigrams, tag_unigrams, unk_prob_dict)
+    transition_probs = calc_interpolated_probs(all_states, tag_probs, tag_types)
+    print(transition_probs)
+    #print(len(all_states))
+    #print(tag_types)
+    #print(tag_unigrams)
+    #print(all_states)
+
+    '''
     init_line_num, trans_line_num, emiss_line_num = 1, len(transitions), len(emissions)
-
+    
     #format data
     init_lines = "BOS 1.0 {}".format(math.log10(1))
     transition_lines = ['{} {} {} {}'.format(bigram_prob[0][0], bigram_prob[0][1], bigram_prob[1][0],
@@ -120,16 +203,34 @@ def make_hmm(data, output_file='tmp_hmm'):
     with open(output_file,'w') as outfile:
         outfile.write(output)
 
+    '''
+
+
+def read_probs(prob_file):
+    prob_dict = defaultdict(float)
+    with open(prob_file, 'rU') as infile:
+        for line in infile:
+            if line:
+                tag, prob = line.strip().split()
+                prob_dict[tag] = float(prob)
+    return prob_dict
+
 
 
 if __name__ == "__main__":
     #output_filename = sys.argv[1]
     input = sys.argv[1]
+    l1, l2, l3 = [float(num) for num in [sys.argv[2], sys.argv[3], sys.argv[4]]]
+    unk_prob_file = sys.argv[5]
     #input = sys.stdin.readlines() #this is how it will actually be executed
     inputlines = []
     regex_obj = re.compile(r'(?<!=\\)/')
+
     with open(input, 'rU') as infile:
         for line in infile:
             inputlines.append(process_sentence(line, regex_obj))
 
-    make_hmm(inputlines)
+    #read in unk_prob_file
+    unk_prob_dict = read_probs(unk_prob_file)
+
+    make_hmm(inputlines, unk_prob_dict, l1, l2, l3)
