@@ -49,7 +49,8 @@ def count_ngrams(input, n=2):
     NOTE that I reverse the word_tag_bigram tuples to be tag_word bigram tuples for easier handling
     :param input: a list of sentence-lists of (word, tag) tuples
     :param n: the n of 'ngram' (eg unigram, bigram). Default  2. Wouldn't actually work with anything else at present.
-    :return: counters of tag unigram, word unigram, tag word bigram,  and tag bigram
+    :return: counters of tag unigram, word unigram, tag word bigram,  and tag bigram. unigrams are strings and bigrams
+    are tuples.
     '''
     tag_unigrams, tag_bigrams, word_unigrams, tag_word_bigrams = Counter(), Counter(), Counter(), Counter()
     for sentence in input:
@@ -121,7 +122,7 @@ if __name__ == "__main__":
     input = sys.argv[1]
     #input = sys.stdin.readlines() #this is how it will actually be executed
     inputlines = []
-    regex_obj = re.compile(r'(?<!=\\)/')
+    regex_obj = re.compile(r'(?<!\\)/')
     with open(input, 'rU') as infile:
         for line in infile:
             inputlines.append(process_sentence(line, regex_obj))

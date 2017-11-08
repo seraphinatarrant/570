@@ -143,7 +143,8 @@ def calc_interpolated_probs(states, prob_dict, tag_types):
                     trigram_prob = 1/(tag_types-1)
                 interpolated_prob = l3*trigram_prob + l2*bigram_prob + l1*unigram_prob
                 interpolated_log = math.log10(interpolated_prob)
-                interpolated_prob_dict[(state_i, state_j)] = (interpolated_prob, interpolated_log)
+                state_label_i, state_label_j = '{}_{}'.format(state_i[0], state_i[1]), '{}_{}'.format(state_j[0], state_j[1])
+                interpolated_prob_dict[(state_label_i, state_label_j)] = (interpolated_prob, interpolated_log)
     return interpolated_prob_dict
 
 def find_all_states(unigrams):
@@ -171,22 +172,17 @@ def make_hmm(data, unk_prob_dict, lambda1, lambda2, lambda3, output_file='tmp_hm
     tag_probs = calc_ngram_probs(tag_unigrams+tag_bigrams+tag_trigrams, tag_tokens)
     emission_probs = calc_word_probs(tag_word_bigrams, tag_unigrams, unk_prob_dict)
     transition_probs = calc_interpolated_probs(all_states, tag_probs, tag_types)
-    print(transition_probs)
-    #print(len(all_states))
-    #print(tag_types)
-    #print(tag_unigrams)
-    #print(all_states)
 
-    '''
-    init_line_num, trans_line_num, emiss_line_num = 1, len(transitions), len(emissions)
+    init_line_num, trans_line_num, emiss_line_num = 1, len(transition_probs), len(emission_probs)
     
     #format data
-    init_lines = "BOS 1.0 {}".format(math.log10(1))
-    transition_lines = ['{} {} {} {}'.format(bigram_prob[0][0], bigram_prob[0][1], bigram_prob[1][0],
-                                             bigram_prob[1][1]) for bigram_prob in transitions.items()]
-    emission_lines = ['{} {} {} {}'.format(bigram_prob[0][0], bigram_prob[0][1], bigram_prob[1][0],
-                                             bigram_prob[1][1]) for bigram_prob in emissions.items()]
-
+    init_lines = "BOS_BOS 1.0 {}".format(math.log10(1))
+    transition_lines = ['{} {} {} {}'.format(state_trans[0][0], state_trans[0][1], state_trans[1][0],
+                                             state_trans[1][1]) for state_trans in transition_probs.items()]
+    emission_lines = ['{} {} {} {}'.format(emission[0][0], emission[0][1], emission[1][0],
+                                             emission[1][1]) for emission in emission_probs.items()]
+    (print(tag_types))
+    (print(len(all_states)))
     output = ("state_num={}\n"
               "sym_num={}\n"
               "init_line_num={}\n"
@@ -203,7 +199,6 @@ def make_hmm(data, unk_prob_dict, lambda1, lambda2, lambda3, output_file='tmp_hm
     with open(output_file,'w') as outfile:
         outfile.write(output)
 
-    '''
 
 
 def read_probs(prob_file):
@@ -224,7 +219,7 @@ if __name__ == "__main__":
     unk_prob_file = sys.argv[5]
     #input = sys.stdin.readlines() #this is how it will actually be executed
     inputlines = []
-    regex_obj = re.compile(r'(?<!=\\)/')
+    regex_obj = re.compile(r'(?<!\\)/')
 
     with open(input, 'rU') as infile:
         for line in infile:
