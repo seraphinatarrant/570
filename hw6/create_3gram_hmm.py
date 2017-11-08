@@ -154,8 +154,8 @@ def find_all_states(unigrams):
     :return: a set of all state labels in bigram tuple form
     '''
     state_set = set()
-    for tag_i in unigrams:
-        for tag_j in unigrams:
+    for tag_i in unigrams|{('BOS',)}: # union set with BOS since a bigram can start with BOS
+        for tag_j in unigrams|{('EOS',)}: #unioin set with EOS since a bigram can end with EOS
             new_tag = (tag_i[0], tag_j[0]) #making a bigram tuple out of that unigram tags (have to index them as the unigrams are tuples)
             state_set.add(new_tag)
     return state_set
@@ -164,7 +164,7 @@ def make_hmm(data, unk_prob_dict, lambda1, lambda2, lambda3, output_file='tmp_hm
     #assume data is preprocessed
     tag_unigrams, tag_bigrams, tag_trigrams, word_unigrams, tag_word_bigrams = count_ngrams(data)
     state_num, sym_num = len(tag_bigrams), len(word_unigrams) #since now the states are bigrams
-    all_states = find_all_states(tag_unigrams)
+    all_states = find_all_states(set(tag_unigrams)-{('BOS',), ('EOS',)}) #remove EOS and BOS before generating all possible states
     tag_tokens, tag_types = sum(tag_unigrams.values()), len(tag_unigrams)
 
 
