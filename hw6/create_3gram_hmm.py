@@ -16,6 +16,12 @@ Transition prob: a_ij = P(s_j|s_i) = P(t_3|t_1, t_2) where s_i = (t_1,t_2) and s
 Where t_2 != t_2' Prob will be 0.
 Emission prob: b_jk = P(w_k|s_j) where s_j = (t1,t2) = P(w_k|t2) for any t1
 
+**Note that there is an independence assumption in Emission prob that a word emission probability is dependent only on
+its tag, and is independent of the previous tag. ie P(word_i|tag_i) == P(word_i|tag_i-1, tag_i).
+However, to create a format that is generaliseable to all HMMs, we need emissions to be based on STATES not on TAGS and
+states are tag bigrams. So emission probabilities will be seriously redundant as a given word tag pair will have to be
+enumerated for all possible word tag bigrams and the probability repeated.
+
 Therefore:
 Transition probabilities between states are trigram probabilities, where states are bigrams that must
 "overlap" by the edges of their bigrams.
@@ -46,6 +52,8 @@ from collections import Counter, defaultdict
 import re
 
 import math
+
+import operator
 
 
 def process_sentence(input, regex):
@@ -92,18 +100,29 @@ def count_ngrams(input):
 def calc_word_probs(bigrams, unigrams, unk_prob_dict):
     '''
     With smoothing based on given P(<unk>|tag)
-    Known words: Psmooth(w|tag) = P(w|tag) * (1 - P(<unk>|tag))
+    Known words: Psmooth(w|tag) = P(w|tag) * (1 - P(<unk>|tag)).
+    Purposefully generates a LOT of redundant probabilities to enumerate all states.
     :param bigrams: a Counter of bigram tuples, of form (tag, word)
     :param unigrams: a Counter of unigram tuples of form (tag, )
     :param unk_prob_dict: a defaultdict(float) of {tag:prob) where prob is P(<unk>|tag)
     :return: a defaultdict of bigram probabilities
     '''
     prob_dict = defaultdict(float)
-    for key in bigrams:
+    unk_symbol = '<unk>'
+    for key in set(bigrams)-{('BOS','<s>')}: #since BOS is never the second in a pair, and we don't want to emit on it
         prob, unk_prob = bigrams[key]/unigrams[(key[0],)], unk_prob_dict[key[0]]
         smooth_prob = prob*(1-unk_prob)
         log_prob = math.log10(smooth_prob)
-        prob_dict[key] = (smooth_prob, log_prob)
+        for tag in set(unigrams)-{('EOS',)}: #since EOS is never the first in a pair
+            #this is the OMFG redundant loop
+            state_label = '{}_{}'.format(tag[0], key[0]) #this is an anyTag_KeyTag label
+            new_key = (state_label, key[1])
+            prob_dict[new_key] = (smooth_prob, log_prob)
+            if unk_prob: #if there is an entry for unknown for this tag:
+                new_unk_key = (state_label, unk_symbol)
+                unk_log_prob = math.log10(unk_prob)
+                prob_dict[new_unk_key] = (unk_prob, unk_log_prob)
+
     return prob_dict
 
 def calc_ngram_probs(ngrams, uni_tokens):
@@ -140,7 +159,10 @@ def calc_interpolated_probs(states, prob_dict, tag_types):
                 if bigram_prob:
                     trigram_prob = prob_dict[(tag1, tag2, tag3)]
                 else:
-                    trigram_prob = 1/(tag_types-1)
+                    if tag3 == 'BOS': #haven't yet tested that this works, but it should
+                        trigram_prob = 0
+                    else:
+                        trigram_prob = 1/(tag_types-1)
                 interpolated_prob = l3*trigram_prob + l2*bigram_prob + l1*unigram_prob
                 interpolated_log = math.log10(interpolated_prob)
                 state_label_i, state_label_j = '{}_{}'.format(state_i[0], state_i[1]), '{}_{}'.format(state_j[0], state_j[1])
@@ -150,10 +172,11 @@ def calc_interpolated_probs(states, prob_dict, tag_types):
 def find_all_states(unigrams):
     '''
     :param unigrams: a dictionary of the unigrams from which to generate all possible bigrams (which are the state
-    labels in a trigram hmm)
+    labels in a trigram hmm). This should NOT include EOS and BOS since our tagger cannot span sentence boundaries and
+    so transitions to BOS or from EOS are impossible.
     :return: a set of all state labels in bigram tuple form
     '''
-    state_set = set()
+    state_set = {('BOS', 'BOS')} #initialise with the first dummy state, which the loops will not generate.
     for tag_i in unigrams|{('BOS',)}: # union set with BOS since a bigram can start with BOS
         for tag_j in unigrams|{('EOS',)}: #unioin set with EOS since a bigram can end with EOS
             new_tag = (tag_i[0], tag_j[0]) #making a bigram tuple out of that unigram tags (have to index them as the unigrams are tuples)
@@ -164,7 +187,8 @@ def make_hmm(data, unk_prob_dict, lambda1, lambda2, lambda3, output_file='tmp_hm
     #assume data is preprocessed
     tag_unigrams, tag_bigrams, tag_trigrams, word_unigrams, tag_word_bigrams = count_ngrams(data)
     state_num, sym_num = len(tag_bigrams), len(word_unigrams) #since now the states are bigrams
-    all_states = find_all_states(set(tag_unigrams)-{('BOS',), ('EOS',)}) #remove EOS and BOS before generating all possible states
+    # remove EOS and BOS from unigrams before generating all possible states since they are not valid in all transitions
+    all_states = find_all_states(set(tag_unigrams)-{('BOS',), ('EOS',)})
     tag_tokens, tag_types = sum(tag_unigrams.values()), len(tag_unigrams)
 
 
@@ -176,13 +200,16 @@ def make_hmm(data, unk_prob_dict, lambda1, lambda2, lambda3, output_file='tmp_hm
     init_line_num, trans_line_num, emiss_line_num = 1, len(transition_probs), len(emission_probs)
     
     #format data
-    init_lines = "BOS_BOS 1.0 {}".format(math.log10(1))
+    init_lines = "BOS_BOS {}".format(1.0, math.log10(1))
     transition_lines = ['{} {} {} {}'.format(state_trans[0][0], state_trans[0][1], state_trans[1][0],
                                              state_trans[1][1]) for state_trans in transition_probs.items()]
+    #emission lines was only sorted because I felt like it for debugging, the sort can be removed for speed
     emission_lines = ['{} {} {} {}'.format(emission[0][0], emission[0][1], emission[1][0],
-                                             emission[1][1]) for emission in emission_probs.items()]
-    (print(tag_types))
-    (print(len(all_states)))
+                                             emission[1][1]) for emission in sorted(emission_probs.items(),
+                                                                                    key=operator.itemgetter(1))]
+    print(tag_types)
+    print(len(all_states))
+
     output = ("state_num={}\n"
               "sym_num={}\n"
               "init_line_num={}\n"
@@ -196,12 +223,17 @@ def make_hmm(data, unk_prob_dict, lambda1, lambda2, lambda3, output_file='tmp_hm
               "{emission_lines}\n").format(state_num, sym_num, init_line_num, trans_line_num, emiss_line_num,
                                            init_lines=init_lines, transition_lines='\n'.join(transition_lines),
                                            emission_lines='\n'.join(emission_lines))
-    with open(output_file,'w') as outfile:
+    with open(output_file, 'w') as outfile:
         outfile.write(output)
 
 
 
 def read_probs(prob_file):
+    '''
+
+    :param prob_file: a file with probabilities for unknown word emissions given tags
+    :return: a dict read from the file
+    '''
     prob_dict = defaultdict(float)
     with open(prob_file, 'rU') as infile:
         for line in infile:
