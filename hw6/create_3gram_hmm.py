@@ -186,10 +186,10 @@ def find_all_states(unigrams):
 def make_hmm(data, unk_prob_dict, lambda1, lambda2, lambda3, output_file='tmp_hmm_trigram'):
     #assume data is preprocessed
     tag_unigrams, tag_bigrams, tag_trigrams, word_unigrams, tag_word_bigrams = count_ngrams(data)
-    state_num, sym_num = len(tag_bigrams), len(word_unigrams) #since now the states are bigrams
     # remove EOS and BOS from unigrams before generating all possible states since they are not valid in all transitions
     all_states = find_all_states(set(tag_unigrams)-{('BOS',), ('EOS',)})
     tag_tokens, tag_types = sum(tag_unigrams.values()), len(tag_unigrams)
+    state_num, sym_num = len(all_states), len(word_unigrams)+1  # the _1 is to account for the <unk> symbol
 
 
     #calc tag probs and word probs and use tag probs to calc interpolated trigram probs (which are transitions)
