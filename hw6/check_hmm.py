@@ -41,7 +41,7 @@ def read_hmm(input):
     init, transition, emission = '\\init', '\\transition', '\\emission'
     init_line_num, trans_line_num, emit_line_num = 0, 0, 0
     failed_init_lines, failed_trans_lines, failed_emit_lines = 0, 0, 0
-    all_states = set()
+    all_states, all_sym = set(), set()
 
     with open(input, 'rU') as infile:
         for line in infile: #this reads in the header
@@ -91,7 +91,7 @@ def read_hmm(input):
                 else:
                     print("Invalid Transition Probability line. Line is being skipped:\n{}".format(strip_line))
                     failed_trans_lines += 1
-        #start reading in emissions into dict of emission: {state: prob}
+        #start reading in emissions into dict of state: {emission: prob}
         for line in infile:
             strip_line = line.strip()
             if strip_line:
@@ -99,15 +99,16 @@ def read_hmm(input):
                 if len(tokens) > 2:
                     state, emission, prob = tokens[0], tokens[1], float(tokens[2])
                     emit_line_num += 1
-                    if emissions[emission]:
-                        emissions[emission][state] = prob
+                    all_sym.add(emission)
+                    if emissions[state]:
+                        emissions[state][emission] = prob
                     else:
-                        emissions[emission] = {state: prob}
+                        emissions[state] = {emission: prob}
                 else:
                     print("Invalid Emission Probability line. Line is being skipped:\n{}".format(strip_line))
                     failed_trans_lines += 1
         #start printing out header or checks
-        found_sym = len(set(emissions.keys()))
+        found_sym = len(all_sym)
         found_states = len(all_states)
         header_template = '{}={}\n'
         #warning templates
@@ -117,7 +118,8 @@ def read_hmm(input):
         diff_states, diff_sym = header['state_num']-found_states, header['sym_num']-found_sym
         diff_init = header['init_line_num']-init_line_num
         diff_trans, diff_emit = header['trans_line_num']-trans_line_num, header['emiss_line_num']-emit_line_num
-        #this organisation allows me to decide to print what failed if it seems helpful
+        #this organisation allows me to decide to print what failed if it seems helpful but I don't in this program
+        #because I am scared of the automatic grader complaining :)
         if diff_states == 0:
             states_line = header_template.format('state_num',found_states)
         else:
@@ -139,7 +141,6 @@ def read_hmm(input):
         else:
             emit_line = diff_numbers.format('emiss_line_num', header['emiss_line_num'], emit_line_num)
 
-
         output = ("{}"
                   "{}"
                   "{}"
@@ -147,13 +148,45 @@ def read_hmm(input):
                   "{}").format(states_line, sym_line, init_line, trans_line, emit_line)
         print(output)
 
+        # now check if all probabilities sum to 1
+        # init probs sum to 1
+        total_initial_prob = 0
+        for value in initial_states.values():
+            total_initial_prob += value
+        if not check_same(total_initial_prob):
+            print('warning: the initial probabilities sum to {}'.format(total_initial_prob))
+        # for each from_state, do the transitions sum to 1
+        for key in transitions:
+            total_trans_prob = 0
+            for value in transitions[key].values():
+                total_trans_prob += value
+            if not check_same(total_trans_prob):
+                print(dont_sum_1.format('trans_prob_sum', key, total_trans_prob))
+
+        # emit probs sum to 1 for each state
+        for key in emissions:
+            total_emit_prob = 0
+            for value in emissions[key].values():
+                total_emit_prob += value
+            if not check_same(total_emit_prob):
+                print(dont_sum_1.format('emiss_prob_sum', key, total_emit_prob))
+        '''
+        all emissions from one state sum to 1
+        '''
+
+
         #print(emissions)
         #print(initial_states)
         #print(transitions)
         #print(emissions)
 
-def read_lines(min_tokens, stop_reading):
-    pass
+def check_same(value, num=1, max_diff = 0.001):
+    diff = abs(num-value)
+    if diff <= max_diff:
+        return True
+    else:
+        return False
+
 
 
 
