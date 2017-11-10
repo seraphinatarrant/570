@@ -109,11 +109,11 @@ def calc_word_probs(bigrams, unigrams, unk_prob_dict):
     '''
     prob_dict = defaultdict(float)
     unk_symbol = '<unk>'
-    for key in set(bigrams)-{('BOS','<s>')}: #since BOS is never the second in a pair, and we don't want to emit on it
+    for key in set(bigrams): #-{('BOS','<s>')}: #since BOS is never the second in a pair, and we don't want to emit on it
         prob, unk_prob = bigrams[key]/unigrams[(key[0],)], unk_prob_dict[key[0]]
         smooth_prob = prob*(1-unk_prob)
         log_prob = math.log10(smooth_prob)
-        for tag in set(unigrams)-{('EOS',)}: #since EOS is never the first in a pair
+        for tag in set(unigrams): #-{('EOS',)}: #since EOS is never the first in a pair
             #this is the OMFG redundant loop
             state_label = '{}_{}'.format(tag[0], key[0]) #this is an anyTag_KeyTag label
             new_key = (state_label, key[1])
@@ -145,24 +145,30 @@ def calc_ngram_probs(ngrams, uni_tokens):
         prob_dict[key] = prob
     return prob_dict
 
-def calc_interpolated_probs(states, prob_dict, tag_types):
+def calc_interpolated_probs(states, prob_dict, tag_types, l1, l2, l3):
     interpolated_prob_dict = defaultdict(float)
     for state_i in states:
         for state_j in states:
             if state_i[1] != state_j[0]:
                 continue
-            elif state_i == state_j:
-                continue
             else: #prob state_i to state_j
                 tag3, tag2, tag1 = state_j[1], state_i[1], state_i[0]
-                unigram_prob, bigram_prob = prob_dict[(tag3,)], prob_dict[(tag2, tag3)]
-                if bigram_prob:
-                    trigram_prob = prob_dict[(tag1, tag2, tag3)]
-                else:
-                    if tag3 == 'BOS': #haven't yet tested that this works, but it should
-                        trigram_prob = 0
+                if tag2 == 'EOS': #creates a "s
+                    unigram_prob = prob_dict[(tag3,)]
+                    if tag3 == 'EOS':
+                        bigram_prob, trigram_prob = 1.0, 1.0
                     else:
-                        trigram_prob = 1/(tag_types-1)
+                        bigram_prob, trigram_prob = 0.0, 0.0
+                else:
+                    unigram_prob, bigram_prob = prob_dict[(tag3,)], prob_dict[(tag2, tag3)]
+                    if prob_dict[(tag1, tag2)]:
+                        trigram_prob = prob_dict[(tag1, tag2, tag3)]
+                    else:
+                        if tag3 == 'BOS':
+                            trigram_prob = 0
+                            #print('found a BOS {} {}'.format(state_i, state_j))
+                        else:
+                            trigram_prob = 1/(tag_types-1)
                 interpolated_prob = l3*trigram_prob + l2*bigram_prob + l1*unigram_prob
                 interpolated_log = math.log10(interpolated_prob)
                 state_label_i, state_label_j = '{}_{}'.format(state_i[0], state_i[1]), '{}_{}'.format(state_j[0], state_j[1])
@@ -176,10 +182,10 @@ def find_all_states(unigrams):
     so transitions to BOS or from EOS are impossible.
     :return: a set of all state labels in bigram tuple form
     '''
-    state_set = {('BOS', 'BOS')} #initialise with the first dummy state, which the loops will not generate.
-    for tag_i in unigrams|{('BOS',)}: # union set with BOS since a bigram can start with BOS
-        for tag_j in unigrams|{('EOS',)}: #unioin set with EOS since a bigram can end with EOS
-            new_tag = (tag_i[0], tag_j[0]) #making a bigram tuple out of that unigram tags (have to index them as the unigrams are tuples)
+    state_set = set()
+    for tag_i in unigrams:
+        for tag_j in unigrams:
+            new_tag = (tag_i[0], tag_j[0])
             state_set.add(new_tag)
     return state_set
 
@@ -187,7 +193,7 @@ def make_hmm(data, unk_prob_dict, lambda1, lambda2, lambda3, output_file='tmp_hm
     #assume data is preprocessed
     tag_unigrams, tag_bigrams, tag_trigrams, word_unigrams, tag_word_bigrams = count_ngrams(data)
     # remove EOS and BOS from unigrams before generating all possible states since they are not valid in all transitions
-    all_states = find_all_states(set(tag_unigrams)-{('BOS',), ('EOS',)})
+    all_states = find_all_states(set(tag_unigrams))
     tag_tokens, tag_types = sum(tag_unigrams.values()), len(tag_unigrams)
     state_num, sym_num = len(all_states), len(word_unigrams)+1  # the _1 is to account for the <unk> symbol
 
@@ -195,7 +201,7 @@ def make_hmm(data, unk_prob_dict, lambda1, lambda2, lambda3, output_file='tmp_hm
     #calc tag probs and word probs and use tag probs to calc interpolated trigram probs (which are transitions)
     tag_probs = calc_ngram_probs(tag_unigrams+tag_bigrams+tag_trigrams, tag_tokens)
     emission_probs = calc_word_probs(tag_word_bigrams, tag_unigrams, unk_prob_dict)
-    transition_probs = calc_interpolated_probs(all_states, tag_probs, tag_types)
+    transition_probs = calc_interpolated_probs(all_states, tag_probs, tag_types, lambda1, lambda2, lambda3)
 
     init_line_num, trans_line_num, emiss_line_num = 1, len(transition_probs), len(emission_probs)
     
@@ -207,8 +213,8 @@ def make_hmm(data, unk_prob_dict, lambda1, lambda2, lambda3, output_file='tmp_hm
     emission_lines = ['{} {} {} {}'.format(emission[0][0], emission[0][1], emission[1][0],
                                              emission[1][1]) for emission in sorted(emission_probs.items(),
                                                                                     key=operator.itemgetter(1))]
-    print(tag_types)
-    print(len(all_states))
+    #print(tag_types)
+    #print(len(all_states))
 
     output = ("state_num={}\n"
               "sym_num={}\n"
@@ -245,19 +251,26 @@ def read_probs(prob_file):
 
 
 if __name__ == "__main__":
-    #output_filename = sys.argv[1]
-    input = sys.argv[1]
-    l1, l2, l3 = [float(num) for num in [sys.argv[2], sys.argv[3], sys.argv[4]]]
+    output_filename = sys.argv[1]
+    #these are for me to read the files in as input for easier debugging (rather than cat | as assignment requires)
+    #output_filename = 'desperate_hmm'
+    #input = sys.argv[1]
+    lambda1, lambda2, lambda3 = [float(num) for num in [sys.argv[2], sys.argv[3], sys.argv[4]]]
+    #print(lambda1,lambda2,lambda3)
     unk_prob_file = sys.argv[5]
     #input = sys.stdin.readlines() #this is how it will actually be executed
     inputlines = []
     regex_obj = re.compile(r'(?<!\\)/')
-
+    '''
     with open(input, 'rU') as infile:
         for line in infile:
             inputlines.append(process_sentence(line, regex_obj))
+    '''
+    input = sys.stdin.readlines()
+    for line in input:
+        inputlines.append(process_sentence(line, regex_obj))
 
     #read in unk_prob_file
     unk_prob_dict = read_probs(unk_prob_file)
 
-    make_hmm(inputlines, unk_prob_dict, l1, l2, l3)
+    make_hmm(inputlines, unk_prob_dict, lambda1, lambda2, lambda3, output_filename)
