@@ -14,8 +14,10 @@ doesn't lock. I may at some point think more about whether that's a valid idea (
 import operator
 import sys
 from collections import defaultdict, deque
+from heapq import heappush, heappop
 
 import math
+
 
 
 def update_state_table(state_table, predecessor, current_state, next_index):
@@ -29,7 +31,7 @@ def update_state_table(state_table, predecessor, current_state, next_index):
     existing_value = state_table[current_state][next_index]
     if existing_value:
         # comparing the probabilities in the tuples, update only if new value is better
-        if predecessor[2] > existing_value[2]:
+        if predecessor[1] > existing_value[1]:
             state_table[current_state][next_index] = predecessor
     else:
         state_table[current_state][next_index] = predecessor
@@ -37,6 +39,9 @@ def update_state_table(state_table, predecessor, current_state, next_index):
 def viterbi(observation, init_states, transitions, emissions):
     '''
     Use logprobs to avoid underflow
+    I made the choice to use FIFO deque to track states and a maxheap to push states onto the queue based on their prob.
+    Since at EACH step I want the highest prob, but I don't actually want highest total prob, since then I'll explore
+    all nodes with less elements (since longer strings just have lower overall probability)
     :param observation: an observation sequence in a list form
     :param hmm: an hmm with init, trans, emit probs for that sequence.
     :return: winner, the sequence that is highest probability for the observation, and the logprob of winner
@@ -44,11 +49,12 @@ def viterbi(observation, init_states, transitions, emissions):
     state_table = defaultdict(lambda: defaultdict(tuple)) #nested to avoid try accepts for keyerrors (which are slow)
     search_states = deque()
     next_index = 0
-    winner = None
+    end_of_input = len(observation)
+    final_states = []
     final_sequence = []
     start_predecessor = ('**', 0.0) #default symbols and logprobs. Predecessor is prev state, probability
     #initialise search queue with start states and update state table with start states
-    start_states = sorted(initial_states.items(), key=operator.itemgetter(1), reverse=True) #sort by highest prob first
+    start_states = sorted(init_states.items(), key=operator.itemgetter(1), reverse=True) #sort by highest prob first
     [search_states.append((item[0], next_index)) for item in start_states]
     #initialise state table with start states
     [update_state_table(state_table, start_predecessor, pair[0], next_index) for pair in start_states]
@@ -56,25 +62,40 @@ def viterbi(observation, init_states, transitions, emissions):
     while search_states:
         #pop a working state and input position off the queue
         current_state, next_index = search_states.popleft()
+        #print('Currently at index: {} of {}'.format(next_index, end_of_input-1))
         #find the intersection of possible transitions with valid emissions
-        trans_states, emit_states = transitions[current_state], emissions[observation[next_index]]
-        valid_to_states = set(transitions) & set(emit_states)
-        for state in valid_to_states:
-            trans_prob, emit_prob = math.log10(trans_states[state]), math.log10(emit_states[state]) #make sure use logs to avoid underflow
-            prev_state_prob = state_table[current_state][next_index][1]
-            new_prob = prev_state_prob + trans_prob + emit_prob #they're logprobs, so adding
-            next_state_predecessor = (current_state, new_prob) #basically the prob to get to here
-            #update state table and append new states
-            update_state_table(state_table, next_state_predecessor, state, next_index+1)
-            search_states.append((state, next_index+1))
-
-            ####NEXT GOING TO HAVE TO DO SOMETHING SO THAT ALL THE FINAL STATES ARE ACCESSIBLE FOR BACKTRACE (or so can pick final final)
-
-
-
-
-    #for each sequence of observations, obtain highest prob sequence of hidden states.
-    return winner#, winner_logprob
+        prev_state_prob = state_table[current_state][next_index][1]  # grabs predecessor and prob to here
+        if next_index < end_of_input:
+            #grab the dict of states that are transition and their prob and the dict of states that emit the observation and their prob
+            valid_transitions, valid_emission_states = transitions[current_state], emissions[observation[next_index]]
+            #need to make sure can handle unknown words
+            if not valid_emission_states:
+                valid_emission_states = emissions['<unk>']
+            valid_to_states = set(valid_transitions) & set(valid_emission_states) #the intersection of the state keys
+            state_heap = []
+            for state in valid_to_states:
+                trans_prob, emit_prob = math.log10(valid_transitions[state]), math.log10(valid_emission_states[state]) #make sure use logs to avoid underflow
+                new_prob = prev_state_prob + trans_prob + emit_prob #they're logprobs, so adding
+                next_state_predecessor = (current_state, new_prob) #basically the prob to get to here
+                heappush(state_heap, (-new_prob, state))
+                #update state table
+                ########could move update state table so it happens when a node is popped of####### If it is being slow
+                update_state_table(state_table, next_state_predecessor, state, next_index + 1)
+            while state_heap:
+                best_state = heappop(state_heap)
+                #append new states
+                search_states.append((best_state, next_index+1))
+           
+        else:
+            heappush(final_states, (-prev_state_prob, current_state)) #neg prob since converting between minheap and want maxheap
+    #returns highest prob of valid final states.
+    if final_states:
+        winner_logprob, winner = heappop(final_states)
+        win_sequence = backtrace(winner, end_of_input, final_sequence, state_table)
+        win_sequence.reverse()
+        return win_sequence, -winner_logprob
+    else:
+        print('No valid observed hidden sequences found')
 
 def check_valid_prob(num, line_num):
     '''
@@ -87,6 +108,14 @@ def check_valid_prob(num, line_num):
     else:
         print('warning: the given prob is not in the [0,1] range on: Line {}. Line skipped.'.format(line_num), file=sys.stderr)
         return False
+
+def backtrace(state, index, final_sequence, state_table): #traces back through the paths from state_table
+    predecessor = state_table[state][index]
+    prev_state = predecessor[0]
+    final_sequence.append(state)
+    if prev_state != '**': #symbol for predecessor of start
+        backtrace(prev_state, index-1, final_sequence, state_table)
+    return final_sequence
 
 def read_hmm(inputfilename):
     '''
@@ -185,8 +214,10 @@ def read_hmm(inputfilename):
 
 if __name__ == "__main__":
     input_hmm, test_file_name, output_file_name = sys.argv[1], sys.argv[2], sys.argv[3]
-    test_observation = "We 're about to see if advertising works .".split()
+    test_observation = "Absent other working capital , he said , the RTC would be forced to delay other thrift resolutions until cash could be raised by selling the bad assets .".split()
+    #test_observation = "normal cold dizzy".split()
     initial_states, transitions, emissions = read_hmm(input_hmm)
-    viterbi(test_observation, initial_states, transitions, emissions)
-    #print(emissions)
+    with open(test_file_name, 'rU') as infile:
+        output_sequence, output_prob = viterbi(test_observation, initial_states, transitions, emissions)
+    print(output_sequence, output_prob)
 
