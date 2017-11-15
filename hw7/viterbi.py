@@ -1,5 +1,10 @@
 '''
-A script that implements VIterbi algorithm on an input hmm file of standard hmm format
+A script that implements VIterbi algorithm on an input hmm file of standard hmm format. Note that for this case,
+BFS is EXTREMELY slow, (unlike Viterbi for a PFA transducer) so I switched the deque to function as a stack and do DFS.
+Then as long as I use a minheap to place the next step on the heap in order of lowest probability first, the first item
+I pop off the stack will always be the highest probability and I can terminate search whenever I successfully reach end
+of input, and know I have found the true winner.
+
 Command to run: viterby.py input_hmm test_file output_file
 
 test file format: one observation per line, which observations whitespace delimited.
@@ -7,8 +12,6 @@ test file format: one observation per line, which observations whitespace delimi
 output file format: observation => state_seq logprob where state_seq is best state seq found and logprob is base 10 of
 that sequence.
 
-I am going to try doing this using a deque rather than a queue.PriorityQueue and I think it will be faster since it
-doesn't lock. I may at some point think more about whether that's a valid idea (since then it's just BFS not dijkstra)
 
 '''
 import operator
@@ -50,19 +53,18 @@ def viterbi(observation, init_states, transitions, emissions):
     search_states = deque()
     next_index = 0
     end_of_input = len(observation)
-    final_states = []
+    winner = None
     final_sequence = []
     start_predecessor = ('**', 0.0) #default symbols and logprobs. Predecessor is prev state, probability
     #initialise search queue with start states and update state table with start states
     start_states = sorted(init_states.items(), key=operator.itemgetter(1), reverse=True) #sort by highest prob first
-    [search_states.append((item[0], next_index)) for item in start_states]
-    #initialise state table with start states
-    [update_state_table(state_table, start_predecessor, pair[0], next_index) for pair in start_states]
+    [search_states.append((item[0], next_index, start_predecessor)) for item in start_states]
 
     while search_states:
         #pop a working state and input position off the queue
-        current_state, next_index = search_states.popleft()
-        #print('Currently at index: {} of {}'.format(next_index, end_of_input-1))
+        current_state, next_index, predecessor = search_states.pop()
+        #update after pop off since then we call the function less often and everything should be faster
+        update_state_table(state_table, predecessor, current_state, next_index)
         #find the intersection of possible transitions with valid emissions
         prev_state_prob = state_table[current_state][next_index][1]  # grabs predecessor and prob to here
         if next_index < end_of_input:
@@ -77,25 +79,22 @@ def viterbi(observation, init_states, transitions, emissions):
                 trans_prob, emit_prob = math.log10(valid_transitions[state]), math.log10(valid_emission_states[state]) #make sure use logs to avoid underflow
                 new_prob = prev_state_prob + trans_prob + emit_prob #they're logprobs, so adding
                 next_state_predecessor = (current_state, new_prob) #basically the prob to get to here
-                heappush(state_heap, (-new_prob, state))
+                heappush(state_heap, (new_prob, state, next_state_predecessor)) #negative logprob to convert minheap to maxheap
                 #update state table
                 ########could move update state table so it happens when a node is popped of####### If it is being slow
-                update_state_table(state_table, next_state_predecessor, state, next_index + 1)
-            while state_heap:
-                best_state = heappop(state_heap)
+                #update_state_table(state_table, next_state_predecessor, state, next_index + 1)
+            while state_heap: #puts states into the deque with the lowest probability first. This is because I switched to a stack and DFS.
+                best_state_prob, best_state, best_state_pred = heappop(state_heap)
                 #append new states
-                search_states.append((best_state, next_index+1))
-           
+                search_states.append((best_state, next_index+1, best_state_pred))
+
         else:
-            heappush(final_states, (-prev_state_prob, current_state)) #neg prob since converting between minheap and want maxheap
-    #returns highest prob of valid final states.
-    if final_states:
-        winner_logprob, winner = heappop(final_states)
-        win_sequence = backtrace(winner, end_of_input, final_sequence, state_table)
-        win_sequence.reverse()
-        return win_sequence, -winner_logprob
-    else:
-        print('No valid observed hidden sequences found')
+            winner = current_state
+            winner_logprob = state_table[winner][end_of_input][1]
+            win_sequence = backtrace(winner, end_of_input, final_sequence, state_table)
+            win_sequence.reverse()
+            return win_sequence, winner_logprob
+    #print('No valid observed hidden sequences found')
 
 def check_valid_prob(num, line_num):
     '''
@@ -217,7 +216,19 @@ if __name__ == "__main__":
     test_observation = "Absent other working capital , he said , the RTC would be forced to delay other thrift resolutions until cash could be raised by selling the bad assets .".split()
     #test_observation = "normal cold dizzy".split()
     initial_states, transitions, emissions = read_hmm(input_hmm)
+    output_lines = []
     with open(test_file_name, 'rU') as infile:
-        output_sequence, output_prob = viterbi(test_observation, initial_states, transitions, emissions)
-    print(output_sequence, output_prob)
+        for line in infile:
+            #print('Running Viterbi for line: {}'.format(line))
+            test_observation = line.strip().split()
+            result = viterbi(test_observation, initial_states, transitions, emissions)
+            if result:
+                output_sequence, output_prob = result
+                new_output_line = '{} => {} {}\n'.format(line.strip(), ' '.join(output_sequence), output_prob)
+            else:
+                new_output_line = '{} => *NONE*\n'.format(line.strip())
+            output_lines.append(new_output_line)
+    with open(output_file_name,'w') as outfile:
+        [outfile.write(output_line) for output_line in output_lines]
+
 

@@ -1,0 +1,26 @@
+state_num=3
+sym_num=3
+init_line_num=1
+trans_line_num=6
+emiss_line_num=6
+
+
+\init
+S0  1.0
+
+
+\transition
+S0       HEALTHY 0.6
+S0       FEVER   0.4
+HEALTHY  HEALTHY 0.7
+HEALTHY  FEVER   0.3
+FEVER    HEALTHY 0.4
+FEVER    FEVER   0.6
+
+\emission
+HEALTHY   normal  0.5
+HEALTHY   cold    0.4
+HEALTHY   dizzy   0.1
+FEVER     normal  0.1
+FEVER     cold    0.3
+FEVER     dizzy   0.6
