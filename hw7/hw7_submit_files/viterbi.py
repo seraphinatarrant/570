@@ -1,5 +1,17 @@
 '''
-A script that implements VIterbi algorithm on an input hmm file of standard hmm format.
+A script that implements Viterbi algorithm on an input hmm file of standard hmm format.
+The key here is the idea of timesteps. The previous version I did enqueued and dequeued states, but that ends up
+visiting the same states many many times if they can be reached from many many place (because each time I dequeue a
+state I look at the states it can go to and then enqueue them).
+But if instead I advance by timesteps (or indexes of input observations) then I can start with an empty state table,
+do a BFS to fill out the current timestep/index of that table with all the states that can be gotten to and their
+predecessor (from which to grab best path later). Then I advance one timestep, and state a queue for BFS FROM THE
+PREVIOUS TIMESTEP. This ensures no redundancy in state exploration.
+
+Key efficiency gains: only explore valid to states given the current state and the observation.
+
+
+
 Command to run: viterby.py input_hmm test_file output_file
 
 test file format: one observation per line, which observations whitespace delimited.
