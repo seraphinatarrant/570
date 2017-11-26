@@ -1,0 +1,18 @@
+
+-------------------- Trial 0  --------------------
+
+Trial 0 Training MaxEntTrainer,gaussianPriorVariance=1.0 with 2700 instances
+Trial 0 Training MaxEntTrainer,gaussianPriorVariance=1.0 finished
+Trial 0 Trainer MaxEntTrainer,gaussianPriorVariance=1.0 training data accuracy= 0.9685185185185186
+Trial 0 Trainer MaxEntTrainer,gaussianPriorVariance=1.0 Test Data Confusion Matrix
+Confusion Matrix, row=true, column=predicted  accuracy=0.8266666666666667
+                    label   0   1   2  |total
+  0    talk.politics.guns  81   1  18  |100
+  1 talk.politics.mideast   3  93   4  |100
+  2    talk.politics.misc  20   6  74  |100
+
+Trial 0 Trainer MaxEntTrainer,gaussianPriorVariance=1.0 test data accuracy= 0.8266666666666667
+
+MaxEntTrainer,gaussianPriorVariance=1.0
+Summary. train accuracy mean = 0.9685185185185186 stddev = 0.0 stderr = 0.0
+Summary. test accuracy mean = 0.8266666666666667 stddev = 0.0 stderr = 0.0

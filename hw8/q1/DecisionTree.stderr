@@ -1,0 +1,28 @@
+Training vectors loaded from /dropbox/17-18/570/hw8/examples/train.vectors
+Testing vectors loaded from /dropbox/17-18/570/hw8/examples/test.vectors
+Splitting feature "israel" infogain=0.1783630791430595
+child0=2350 child1=350
+Splitting feature "lo" infogain=0.04358930304293873
+child0=347 child1=3
+Splitting feature "an" infogain=0.2516291673878229
+child0=1 child1=2
+Splitting feature "jack" infogain=0.03607394162443639
+child0=331 child1=16
+Splitting feature "has" infogain=0.2710382325345575
+child0=11 child1=5
+Splitting feature "repeated" infogain=0.034599574162548496
+child0=323 child1=8
+Splitting feature "turkish" infogain=0.15628750790170454
+child0=2161 child1=189
+Splitting feature "mar" infogain=0.09244880015864897
+child0=174 child1=15
+Splitting feature "again" infogain=0.17095059445466876
+child0=12 child1=3
+Splitting feature "liberal" infogain=0.03954876377313417
+child0=173 child1=1
+Splitting feature "gun" infogain=0.11688062473019811
+child0=1815 child1=346
+Splitting feature "homeland" infogain=0.07184469497938906
+child0=343 child1=3
+Splitting feature "fbi" infogain=0.07644879758289203
+child0=1544 child1=271

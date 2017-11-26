@@ -1,0 +1,26 @@
+Training vectors loaded from train1.vectors
+Testing vectors loaded from test1.vectors
+Splitting feature "israel" infogain=0.16537733954635536
+child0=2373 child1=327
+Splitting feature "fortress" infogain=0.04534542618675541
+child0=325 child1=2
+Splitting feature "scott" infogain=0.03483531251968264
+child0=319 child1=6
+Splitting feature "how" infogain=0.2516291673878229
+child0=2 child1=4
+Splitting feature "amendment" infogain=0.03193101337145654
+child0=315 child1=4
+Splitting feature "turkish" infogain=0.169704773942976
+child0=2163 child1=210
+Splitting feature "arromdee" infogain=0.07283940887095755
+child0=195 child1=15
+Splitting feature "c" infogain=0.17095059445466876
+child0=12 child1=3
+Splitting feature "option" infogain=0.029749781020691327
+child0=194 child1=1
+Splitting feature "gun" infogain=0.10725409410677833
+child0=1817 child1=346
+Splitting feature "koresh" infogain=0.07204596973021771
+child0=290 child1=56
+Splitting feature "clayton" infogain=0.07619929091133293
+child0=1703 child1=114
