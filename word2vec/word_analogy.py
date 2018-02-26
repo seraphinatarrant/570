@@ -15,36 +15,6 @@ Find w* = argmax_w sim(x_w, x_d) #find the word that is most similar to x_d
 store vectors as an word2idx map and an array of vectors
 if a word is OOV, treat it as a zero-vector
 
-
-
-Cosine:
-athens greece baghdad *iraq*
-athens greece bangkok bangkok
-athens greece beijing beijing
-athens greece berlin germany
-athens greece bern bern
-athens greece cairo *greece*
-athens greece canberra *belgium*
-athens greece hanoi hanoi
-athens greece havana *cuba*
-athens greece helsinki *finland*
-athens greece islamabad islamabad
-athens greece kabul afghanistan
-
-Euclidean:
-athens greece baghdad baghdad
-athens greece bangkok bangkok
-athens greece beijing beijing
-athens greece berlin germany
-athens greece bern bern
-athens greece cairo *greece*
-athens greece canberra canberra
-athens greece hanoi hanoi
-athens greece havana havana
-athens greece helsinki *finland*
-athens greece islamabad islamabad
-athens greece kabul afghanistan
-
 Lesson:
 For me, the bottleneck was getting the similarity metrics for the "d vector", comparing it with every blessed entry in
 what was read in from `vectors.txt`.  It was excruciatingly slow in a for loop, but it's much faster if you do
@@ -106,14 +76,6 @@ def read_vectors(input_file, norm_flag):
 
 
 def cosine_sim(x_d, vec_array):
-    #best_w, best_vec, best_d = None, None, -2 #set to values that will be overwritten as all cosine sim > -2
-    #for word in word2index:
-    #    vec = vec_array[word2index[word]]
-    #    co_sim = 1 - spatial.distance.cosine(x_d, vec)
-    #    if co_sim > best_d:
-    #        best_w, best_vec, best_d = word, vec, co_sim
-
-    #return best_w
     #take dot product of 2 vectors. which reduces dimensionality and gives me an array of results.
     #IMPORTANT that vec_array is first arg as a result
     dot_prod_array = np.dot(vec_array, x_d)
@@ -150,9 +112,12 @@ def compute_analogies(word2index, index2word, vec_array, vec_length, input_dir, 
     :param sim: a flag that if 0 uses Euclidean similarity, if >0 uses cosine
     :return: none - writes all files to output dir and accuracy info to stdout
     '''
+    #initialise a zero vector for OOV words
     zero_vec = np.zeros(vec_length)
+    #files to process
     files = sorted(os.listdir(input_dir))
     #files = ['capital-common-countries.txt']
+    sum_total, sum_total_corr = 0, 0
     for filename in files:
         output_lines = []
         with open(os.path.join(input_dir, filename), 'rU') as infile:
@@ -187,10 +152,13 @@ def compute_analogies(word2index, index2word, vec_array, vec_length, input_dir, 
                     output_lines.append(output_line)
         #print accuracy
         print('{}:'.format(filename))
-        print('ACCURACY TOP1: {}% ({}/{})'.format(total_corr/total*100, total_corr, total))
+        print('ACCURACY TOP1: {}% ({}/{})'.format(100*total_corr/total, total_corr, total))
         #write to output dir
         with open(os.path.join(output_dir, filename), 'w') as outfile:
             outfile.write('\n'.join(output_lines))
+        sum_total += total
+        sum_total_corr += total_corr
+    print('Total accuracy: {}%  ({}/{})'.format(100*sum_total_corr/sum_total, sum_total_corr, sum_total))
 
 
 if __name__ == "__main__":

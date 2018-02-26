@@ -28,7 +28,7 @@ eval vectors2classify --training-file train1.vectors --testing-file test1.vector
     subprocess.run('mallet import-file --input {} --output {}'.format(
         train_output_filename, output_dir + '/final_train.vectors'), shell=True)
     subprocess.run('mallet import-file --input {} --output {}'.format(
-        test_output_filename, output_dir + '/final_test.vectors'), shell=True)
+        test_output_filename, output_dir + '/final_test.vectors'), shell=True) ##don't I need to use "--use-pipe-from?
 
     subprocess.run('mallet train-classifier --training-file {0}/final_train.vectors --testing-file {0}/final_test.vectors '
                    '--trainer MaxEnt --output-classifier {0}/me_model '
