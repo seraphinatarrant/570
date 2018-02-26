@@ -17,5 +17,5 @@ done
 
 #for trainer in $trainers
 #do
-#    eval vectors2classify --training-file /dropbox/17-18/570/hw8/examples/train.vectors --testing-file /dropbox/17-18/570/hw8/examples/test.vectors --trainer MaxEnt --output-classifier me-model > me_model.stdout 2>me_model.stderr
+#    eval vectors2classify --training-file /dropbox/17-18/570/feature_vector_preprocessing/examples/train.vectors --testing-file /dropbox/17-18/570/feature_vector_preprocessing/examples/test.vectors --trainer MaxEnt --output-classifier me-model > me_model.stdout 2>me_model.stderr
 #done

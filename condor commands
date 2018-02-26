@@ -1,0 +1,9 @@
+universe        = vanilla
+executable      = maxent_tagger.sh
+getenv          = true
+output          = ./condor/1-1
+error           = ./condor/1-1.err
+log             = ./condor/1-1.log
+arguments       = "examples/wsj_sec0.word_pos examples/test.word_pos 1 1 res_1_1"
+transfer_executable = false
+queue
